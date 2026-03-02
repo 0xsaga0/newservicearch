@@ -1,0 +1,953 @@
+openapi: 3.0.0
+info:
+  title: E-Commerce Order Management API
+  description: API для управления заказами интернет-магазина с микросервисной архитектурой
+  version: 1.0.0
+  contact:
+    name: Дипломный проект
+    email: student@university.edu
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+  - url: http://localhost:3000/v1
+    description: Local development
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    # Общие схемы данных
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: "Bad request"
+        details:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: string
+          format: date-time
+          
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: "john_doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        role:
+          type: string
+          enum: [user, admin, manager]
+          example: "user"
+        createdAt:
+          type: string
+          format: date-time
+        lastLogin:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+          example: true
+          
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 101
+        name:
+          type: string
+          example: "Ноутбук ASUS"
+        description:
+          type: string
+          example: "16GB RAM, 512GB SSD"
+        price:
+          type: number
+          format: float
+          example: 75000.50
+        category:
+          type: string
+          example: "electronics"
+        stockQuantity:
+          type: integer
+          example: 15
+        images:
+          type: array
+          items:
+            type: string
+          example: ["https://example.com/img1.jpg"]
+          
+    OrderItem:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: integer
+          example: 101
+        productName:
+          type: string
+          example: "Ноутбук ASUS"
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+        price:
+          type: number
+          example: 75000.50
+        total:
+          type: number
+          example: 150001.00
+          
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1001
+        orderNumber:
+          type: string
+          example: "ORD-2024-0001"
+        userId:
+          type: integer
+          example: 1
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        totalAmount:
+          type: number
+          example: 150001.00
+        status:
+          type: string
+          enum: [pending, processing, paid, shipped, delivered, cancelled]
+          example: "pending"
+        paymentMethod:
+          type: string
+          enum: [card, cash, balance]
+          example: "card"
+        paymentId:
+          type: string
+          example: "pay_123456"
+        shippingAddress:
+          type: string
+          example: "ул. Ленина, д. 1, кв. 10"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deliveryDate:
+          type: string
+          format: date-time
+          nullable: true
+          
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5001
+        paymentNumber:
+          type: string
+          example: "PAY-2024-0001"
+        orderId:
+          type: integer
+          example: 1001
+        userId:
+          type: integer
+          example: 1
+        amount:
+          type: number
+          example: 150001.00
+        method:
+          type: string
+          enum: [card, cash, balance]
+        status:
+          type: string
+          enum: [pending, completed, failed, refunded]
+        transactionId:
+          type: string
+          example: "txn_123456789"
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+          
+    Balance:
+      type: object
+      properties:
+        userId:
+          type: integer
+          example: 1
+        balance:
+          type: number
+          example: 50000.00
+        currency:
+          type: string
+          example: "RUB"
+        lastUpdated:
+          type: string
+          format: date-time
+          
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 9001
+        userId:
+          type: integer
+          example: 1
+        type:
+          type: string
+          enum: [order_created, payment_received, order_shipped, order_delivered]
+        title:
+          type: string
+          example: "Заказ оплачен"
+        message:
+          type: string
+          example: "Ваш заказ №ORD-2024-0001 успешно оплачен"
+        read:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          
+    # Схемы запросов
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        password:
+          type: string
+          format: password
+          example: "securePassword123"
+          
+    RegisterRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          example: "john_doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: "securePassword123"
+          
+    CreateOrderRequest:
+      type: object
+      required:
+        - items
+        - shippingAddress
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - productId
+              - quantity
+            properties:
+              productId:
+                type: integer
+                example: 101
+              quantity:
+                type: integer
+                minimum: 1
+                example: 2
+        shippingAddress:
+          type: string
+          example: "ул. Ленина, д. 1, кв. 10"
+        paymentMethod:
+          type: string
+          enum: [card, cash, balance]
+          default: "card"
+        promoCode:
+          type: string
+          example: "SUMMER2024"
+          nullable: true
+          
+    PaymentRequest:
+      type: object
+      required:
+        - orderId
+        - paymentMethod
+      properties:
+        orderId:
+          type: integer
+          example: 1001
+        paymentMethod:
+          type: string
+          enum: [card, balance]
+        cardDetails:
+          type: object
+          properties:
+            cardNumber:
+              type: string
+              pattern: '^[0-9]{16}$'
+              example: "4242424242424242"
+            expiryMonth:
+              type: integer
+              minimum: 1
+              maximum: 12
+              example: 12
+            expiryYear:
+              type: integer
+              minimum: 2024
+              example: 2025
+            cvv:
+              type: string
+              pattern: '^[0-9]{3,4}$'
+              example: "123"
+              
+    # Схемы ответов
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Login successful"
+        user:
+          $ref: '#/components/schemas/User'
+        tokens:
+          type: object
+          properties:
+            accessToken:
+              type: string
+              example: "eyJhbGciOiJIUzI1NiIs..."
+            refreshToken:
+              type: string
+              example: "eyJhbGciOiJIUzI1NiIs..."
+            expiresIn:
+              type: integer
+              example: 3600
+              
+    OrdersListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 42
+        limit:
+          type: integer
+          example: 10
+        offset:
+          type: integer
+          example: 0
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+            
+  parameters:
+    orderIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: ID заказа
+    limitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+        maximum: 100
+      description: Количество записей на странице
+    offsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+      description: Смещение от начала
+
+# Аутентификация и пользователи
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Регистрация нового пользователя
+      description: Создает новую учетную запись пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Пользователь успешно зарегистрирован
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User registered successfully"
+                  user:
+                    $ref: '#/components/schemas/User'
+                  tokens:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                      refreshToken:
+                        type: string
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Пользователь уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Вход в систему
+      description: Аутентификация пользователя и получение токенов
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Неверные учетные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Аккаунт заблокирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Обновление токена доступа
+      description: Получение нового access token по refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Новый токен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  expiresIn:
+                    type: integer
+        '401':
+          description: Невалидный refresh token
+
+  /users/profile:
+    get:
+      tags:
+        - Users
+      summary: Получение профиля пользователя
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Не авторизован
+
+    put:
+      tags:
+        - Users
+      summary: Обновление профиля
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Профиль обновлен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+# Управление заказами
+  /orders:
+    post:
+      tags:
+        - Orders
+      summary: Создание нового заказа
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Заказ создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  order:
+                    $ref: '#/components/schemas/Order'
+        '400':
+          description: Ошибка в данных
+        '401':
+          description: Не авторизован
+        '503':
+          description: Сервис временно недоступен
+
+    get:
+      tags:
+        - Orders
+      summary: Получение списка заказов
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, paid, shipped, delivered, cancelled]
+          description: Фильтр по статусу
+      responses:
+        '200':
+          description: Список заказов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdersListResponse'
+
+  /orders/{id}:
+    get:
+      tags:
+        - Orders
+      summary: Получение заказа по ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/orderIdParam'
+      responses:
+        '200':
+          description: Детали заказа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '403':
+          description: Нет доступа к заказу
+        '404':
+          description: Заказ не найден
+
+  /orders/{id}/cancel:
+    post:
+      tags:
+        - Orders
+      summary: Отмена заказа
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/orderIdParam'
+      responses:
+        '200':
+          description: Заказ отменен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  order:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      status:
+                        type: string
+        '400':
+          description: Заказ нельзя отменить
+
+  /orders/{id}/status:
+    patch:
+      tags:
+        - Orders
+      summary: Обновление статуса заказа (только для админов)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/orderIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [processing, shipped, delivered]
+      responses:
+        '200':
+          description: Статус обновлен
+        '403':
+          description: Недостаточно прав
+
+# Платежи
+  /payments/balance:
+    get:
+      tags:
+        - Payments
+      summary: Получение баланса пользователя
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Текущий баланс
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+
+  /payments/deposit:
+    post:
+      tags:
+        - Payments
+      summary: Пополнение баланса
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+              properties:
+                amount:
+                  type: number
+                  minimum: 100
+                  example: 5000
+      responses:
+        '200':
+          description: Баланс пополнен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  newBalance:
+                    type: number
+
+  /payments/history:
+    get:
+      tags:
+        - Payments
+      summary: История платежей
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+      responses:
+        '200':
+          description: История платежей
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  payments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payment'
+
+  /payments:
+    post:
+      tags:
+        - Payments
+      summary: Создание платежа
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          description: Платеж создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+
+# Уведомления
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Получение уведомлений
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Список уведомлений
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+
+  /notifications/{id}/read:
+    post:
+      tags:
+        - Notifications
+      summary: Отметить уведомление как прочитанное
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Уведомление отмечено
+
+# Товары
+  /products:
+    get:
+      tags:
+        - Products
+      summary: Получение списка товаров
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+      responses:
+        '200':
+          description: Список товаров
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+
+  /products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Получение товара по ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Детали товара
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Товар не найден
+
+# Статистика
+  /stats/orders:
+    get:
+      tags:
+        - Statistics
+      summary: Статистика по заказам
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Статистика заказов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalOrders:
+                    type: integer
+                  totalSpent:
+                    type: number
+                  averageOrderValue:
+                    type: number
+                  byStatus:
+                    type: object
+                    additionalProperties:
+                      type: integer
+
+# Внутренние API (для микросервисов)
+  /internal/verify/{token}:
+    get:
+      tags:
+        - Internal
+      summary: Проверка токена (внутренний)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Результат проверки
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  user:
+                    $ref: '#/components/schemas/User'

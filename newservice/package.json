@@ -1,0 +1,37 @@
+{
+  "name": "newservice",
+  "version": "1.0.0",
+  "description": "Микросервисная архитектура интернет-магазина",
+  "scripts": {
+    "start:auth": "cd auth-service && node server.js",
+    "start:order": "cd order-service && node server.js",
+    "start:payment": "cd payment-service && node server.js",
+    "start:inventory": "cd inventory-service && node server.js",
+    "start:notification": "cd notification-service && node server.js",
+    "start:all": "concurrently \"npm run start:auth\" \"npm run start:order\" \"npm run start:payment\" \"npm run start:inventory\" \"npm run start:notification\"",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration --runInBand",
+    "test:e2e": "jest tests/e2e --runInBand --forceExit",
+    "test:errors": "jest tests/error-handling",
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e && npm run test:errors",
+    "test:coverage": "jest --coverage",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "supertest": "^6.3.0",
+    "axios-mock-adapter": "^1.21.0",
+    "nock": "^13.3.0",
+    "ioredis-mock": "^8.0.0",
+    "concurrently": "^8.0.0",
+    "wait-on": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ],
+    "testTimeout": 10000
+  }
+}
